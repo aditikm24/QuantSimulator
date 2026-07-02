@@ -10,14 +10,13 @@ import numpy as np
 app = FastAPI()
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
-if os.path.exists(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/")
 def read_root():
-    if os.path.exists(static_dir):
-        return FileResponse(os.path.join(static_dir, "index.html"))
-    return {"message": "API is running. UI is served by Vercel."}
+    return FileResponse(os.path.join(static_dir, "index.html"))
 
 class SimulationRequest(BaseModel):
     ticker: str

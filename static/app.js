@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
             historical_days: historicalDays,
             simulation_days: simulationDays,
             model,
-            num_simulations: 10, // Reduced from 100 for Vercel timeout limits
+            num_simulations: 100, // Reduced from 1000 for browser memory safety, enough for VaR demo
             strike_price: strikePrice
         };
 
