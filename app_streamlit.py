@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from models import AdvancedSimulationModels
-from fetch_data import fetch_historical_data
+from fetch_data import get_historical_data
 import datetime
 
 # --- PAGE CONFIG ---
@@ -35,17 +35,21 @@ lookback = st.sidebar.selectbox("Historical Lookback Period", list(period_mappin
 
 # Data Fetching & Parameter Estimation
 st.sidebar.markdown("### Estimated Parameters")
+df_hist = None
 try:
     if ticker:
-        hist_data_dict = fetch_historical_data([ticker], period_mapping[lookback])
-        if ticker in hist_data_dict and not hist_data_dict[ticker].empty:
-            df = hist_data_dict[ticker]
-            last_price = df['close'].iloc[-1]
+        hist_data = get_historical_data([ticker], period_mapping[lookback])
+        if ticker in hist_data['prices'] and len(hist_data['prices'][ticker]) > 0:
+            prices_list = hist_data['prices'][ticker]
+            last_price = prices_list[-1]
+            
+            # DataFrame for display
+            df_hist = pd.DataFrame({'Date': hist_data['dates'], 'Close': prices_list})
             
             # Calculate actual historical drift and vol
-            log_returns = np.log(df['close'] / df['close'].shift(1)).dropna()
-            hist_mu = float(log_returns.mean() * 252)
-            hist_sigma = float(log_returns.std() * np.sqrt(252))
+            log_ret_series = hist_data['log_returns'][ticker]
+            hist_mu = float(log_ret_series.mean() * 252)
+            hist_sigma = float(log_ret_series.std() * np.sqrt(252))
         else:
             st.sidebar.error("Failed to fetch data.")
             st.stop()
@@ -167,6 +171,6 @@ if run_button:
             
     with tab3:
         st.markdown("### Historical Data")
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df_hist, use_container_width=True)
 else:
     st.info("Configure your parameters in the sidebar and click 'Run Simulation' to begin.")
