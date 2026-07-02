@@ -1,46 +1,52 @@
-import sys
 import yfinance as yf
+import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 
-def fetch_data(ticker, start_date=None, end_date=None):
-    if start_date and end_date:
-        # Parse dates
-        try:
-            start = datetime.strptime(start_date, '%Y-%m-%d')
-            end = datetime.strptime(end_date, '%Y-%m-%d')
-        except ValueError:
-            print(f"Error: Invalid date format. Use YYYY-MM-DD.")
-            sys.exit(1)
-
-        # Ensure start date is before end date
-        if start >= end:
-            print(f"Error: Start date {start_date} must be before end date {end_date}.")
-            sys.exit(1)
-
-        # Adjust end date to include the end date (yfinance end date is exclusive)
-        adjusted_end = end + timedelta(days=1)
-        adjusted_end_str = adjusted_end.strftime('%Y-%m-%d')
-
-        data = yf.download(ticker, start=start_date, end=adjusted_end_str, interval='1d')
-    else:
-        data = yf.download(ticker, period='max', interval='1d')
-
+def get_historical_data(tickers, days: int):
+    """
+    Fetches historical stock data for the given tickers for a specified number of days.
+    tickers: list of strings (e.g. ['AAPL', 'MSFT'])
+    Returns: A dictionary with:
+      - 'dates': list of string dates
+      - 'prices': dict mapping ticker -> list of closing prices
+      - 'log_returns': pandas DataFrame of daily log returns for all tickers
+    """
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    # Download data
+    data = yf.download(tickers, start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval='1d')
     if data.empty:
-        print(f"Error: No data fetched for {ticker} from {start_date} to {end_date}.")
-        sys.exit(1)
+        raise ValueError(f"No data found for tickers {tickers}")
+        
+    # If a single ticker is passed, yfinance returns a single level column index.
+    # If multiple, it returns a MultiIndex (PriceType, Ticker).
+    # We only want 'Close' prices.
+    
+    if len(tickers) == 1:
+        ticker = tickers[0]
+        close_df = pd.DataFrame(data['Close'])
+        close_df.columns = [ticker]
     else:
-        data.to_csv('stock_data.csv')
-        print("Data fetched successfully.")
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python fetch_data.py <ticker> [<start_date> <end_date>]")
-        sys.exit(1)
-
-    ticker = sys.argv[1]
-    if len(sys.argv) == 4:
-        start_date = sys.argv[2]
-        end_date = sys.argv[3]
-        fetch_data(ticker, start_date, end_date)
-    else:
-        fetch_data(ticker)
+        # data['Close'] is already a DataFrame where columns are the tickers
+        close_df = data['Close']
+        
+    # Drop rows with NaN values (e.g. market holidays or missing data)
+    close_df = close_df.dropna()
+    
+    # Calculate daily log returns
+    log_returns = np.log(close_df / close_df.shift(1)).dropna()
+    
+    # Prepare the output format
+    dates = close_df.index.strftime('%Y-%m-%d').tolist()
+    
+    prices = {}
+    for ticker in tickers:
+        prices[ticker] = close_df[ticker].tolist()
+        
+    return {
+        'dates': dates,
+        'prices': prices,
+        'log_returns': log_returns
+    }
