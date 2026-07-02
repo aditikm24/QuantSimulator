@@ -4,3 +4,5 @@ yfinance
 numpy
 pandas
 scipy
+streamlit
+plotly
