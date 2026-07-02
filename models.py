@@ -1,6 +1,13 @@
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
+import math
+
+# Custom normal distribution functions to remove heavy scipy dependency
+def norm_cdf(x):
+    return (1.0 + math.erf(x / math.sqrt(2.0))) / 2.0
+
+def norm_pdf(x):
+    return math.exp(-0.5 * x**2) / math.sqrt(2 * math.pi)
 
 class AdvancedSimulationModels:
     def __init__(self, historical_data_dict, risk_free_rate=0.05):
@@ -132,16 +139,16 @@ class AdvancedSimulationModels:
         d2 = d1 - sigma * np.sqrt(T)
         
         # Call Greeks
-        delta_call = norm.cdf(d1)
-        gamma = norm.pdf(d1) / (S * sigma * np.sqrt(T))
-        theta_call = (- (S * norm.pdf(d1) * sigma) / (2 * np.sqrt(T)) 
-                      - r * K * np.exp(-r * T) * norm.cdf(d2)) / 365 # Daily decay
-        vega = S * norm.pdf(d1) * np.sqrt(T) * 0.01 # Per 1% change in vol
+        delta_call = norm_cdf(d1)
+        gamma = norm_pdf(d1) / (S * sigma * np.sqrt(T))
+        theta_call = (- (S * norm_pdf(d1) * sigma) / (2 * np.sqrt(T)) 
+                      - r * K * np.exp(-r * T) * norm_cdf(d2)) / 365 # Daily decay
+        vega = S * norm_pdf(d1) * np.sqrt(T) * 0.01 # Per 1% change in vol
         
         # Put Greeks
         delta_put = delta_call - 1
-        theta_put = (- (S * norm.pdf(d1) * sigma) / (2 * np.sqrt(T)) 
-                     + r * K * np.exp(-r * T) * norm.cdf(-d2)) / 365 # Daily decay
+        theta_put = (- (S * norm_pdf(d1) * sigma) / (2 * np.sqrt(T)) 
+                     + r * K * np.exp(-r * T) * norm_cdf(-d2)) / 365 # Daily decay
                      
         return {
             "delta_call": float(delta_call),
