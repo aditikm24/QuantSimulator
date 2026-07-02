@@ -76,14 +76,6 @@ run_button = st.sidebar.button("Run Simulation", use_container_width=True, type=
 
 # --- MAIN BODY ---
 if run_button:
-    # Run Simulation
-    sim_model = AdvancedSimulationModels(
-        historical_data={ticker: df},
-        tickers=[ticker],
-        simulation_days=time_horizon,
-        num_simulations=num_paths
-    )
-    
     # We will implement custom GBM simulation here to use the overridden mu/sigma if Manual is selected.
     # AdvancedSimulationModels automatically calculates it, so we replicate the core GBM here for the override feature.
     dt = 1 / 252
