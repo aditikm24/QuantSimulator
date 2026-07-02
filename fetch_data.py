@@ -16,7 +16,7 @@ def get_historical_data(tickers, days: int):
     start_date = end_date - timedelta(days=days)
     
     # Download data
-    data = yf.download(tickers, start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval='1d')
+    data = yf.download(tickers, start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), interval='1d', threads=False)
     if data.empty:
         raise ValueError(f"No data found for tickers {tickers}")
         
