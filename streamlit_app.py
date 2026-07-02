@@ -40,7 +40,7 @@ st.markdown("""
 # --- Sidebar ---
 st.sidebar.title("Configuration")
 
-tickers_input = st.sidebar.text_input("Ticker(s) (comma-separated)", "AAPL")
+tickers_input = st.sidebar.text_input("Ticker(s) (comma-separated)", value="AAPL", placeholder="e.g. AAPL, MSFT, GOOG")
 lookback = st.sidebar.selectbox("Historical Lookback Period", ["1 Month", "6 Months", "1 Year", "2 Years", "5 Years"], index=2)
 model_choice = st.sidebar.selectbox("Financial Model (Single Asset Only)", ["Geometric Brownian Motion (GBM)", "Merton Jump Diffusion"])
 strike_price_input = st.sidebar.number_input("Strike Price (Optional, Single Asset)", value=0.0, step=1.0)
