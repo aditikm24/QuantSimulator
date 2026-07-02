@@ -89,6 +89,13 @@ if st.sidebar.button("Run Simulation", type="primary", use_container_width=True)
             last_date = datetime.strptime(last_date_str, '%Y-%m-%d')
             future_dates = [(last_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(days_to_sim + 1)]
             
+            # Calculate Historical Prices for charting
+            if is_portfolio:
+                hist_prices_array = np.array([hist_data['prices'][t] for t in tickers])
+                hist_prices = np.sum(hist_prices_array, axis=0).tolist()
+            else:
+                hist_prices = hist_data['prices'][tickers[0]]
+            
             # --- Main Content Area ---
             st.title("Simulated Price Trajectories")
             
@@ -98,6 +105,13 @@ if st.sidebar.button("Run Simulation", type="primary", use_container_width=True)
             with tab1:
                 st.markdown("Showing the projected price walks over time. The **golden bold line** represents the median path.")
                 fig1 = go.Figure()
+                
+                # Plot Historical Data
+                fig1.add_trace(go.Scatter(
+                    x=hist_data['dates'], y=hist_prices, mode='lines',
+                    line=dict(color='#3b82f6', width=2),
+                    name='Historical Data'
+                ))
                 
                 # Plot subset of paths for performance
                 max_plot_paths = min(num_sims, 50)
