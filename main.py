@@ -24,7 +24,7 @@ class SimulationRequest(BaseModel):
     simulation_days: int = 30
     model: str = "gbm" # "gbm" or "jump"
     num_simulations: int = 10
-    strike_price: float = None
+    strike_price: float | None = None
 
 @app.post("/api/simulate")
 def run_simulation(req: SimulationRequest):

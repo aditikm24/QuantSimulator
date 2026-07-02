@@ -44,7 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!response.ok) {
                 const errData = await response.json();
-                throw new Error(errData.detail || 'Simulation failed');
+                const errMsg = typeof errData.detail === 'string' ? errData.detail : JSON.stringify(errData.detail);
+                throw new Error(errMsg || 'Simulation failed');
             }
 
             const data = await response.json();
