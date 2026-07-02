@@ -14,6 +14,10 @@ class SimulationRequest(BaseModel):
     num_simulations: int = 10
     strike_price: float = None
 
+@app.get("/api/test")
+def test_endpoint():
+    return {"status": "ok"}
+
 @app.post("/api/simulate")
 def run_simulation(req: SimulationRequest):
     try:
