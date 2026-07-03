@@ -46,6 +46,11 @@ model_choice = st.sidebar.selectbox("Financial Model (Single Asset Only)", ["Geo
 strike_price_input = st.sidebar.number_input("Strike Price (Optional, Single Asset)", value=0.0, step=1.0)
 
 st.sidebar.markdown("### Run Parameters")
+run_mode = st.sidebar.radio("Operation Mode", ["Forecast Future", "Backtest Historical"])
+
+if run_mode == "Backtest Historical":
+    st.sidebar.info("Backtest Mode: Simulates a past date and compares the model against what actually happened.")
+
 num_sims = st.sidebar.slider("Number of Simulation Paths", min_value=10, max_value=1000, value=100, step=10)
 days_to_sim = st.sidebar.slider("Time Horizon (Trading Days)", min_value=5, max_value=252, value=30, step=5)
 
@@ -59,7 +64,34 @@ if st.sidebar.button("Run Simulation", type="primary", use_container_width=True)
     try:
         with st.spinner("Fetching data and running simulations..."):
             # 1. Fetch Data
-            hist_data = get_historical_data(tickers, hist_days)
+            if run_mode == "Backtest Historical":
+                total_trading_days_needed = hist_days + days_to_sim
+                # Fetch a generous amount of calendar days to ensure we get enough trading days
+                all_data = get_historical_data(tickers, int(total_trading_days_needed * 1.5))
+                
+                dates_list = all_data['dates']
+                
+                if len(dates_list) <= total_trading_days_needed:
+                    st.error(f"Not enough historical data for this backtest. Try a shorter lookback or horizon.")
+                    st.stop()
+                    
+                split_idx = len(dates_list) - days_to_sim
+                
+                # Calibration Data
+                hist_data = {
+                    'dates': dates_list[split_idx - hist_days : split_idx],
+                    'prices': {t: all_data['prices'][t][split_idx - hist_days : split_idx] for t in tickers},
+                }
+                close_df = pd.DataFrame(hist_data['prices'])
+                hist_data['log_returns'] = np.log(close_df / close_df.shift(1)).dropna()
+                
+                # Actual Future Data (starts at split_idx - 1 to connect the lines)
+                actual_future = {
+                    'dates': dates_list[split_idx - 1 :],
+                    'prices': {t: all_data['prices'][t][split_idx - 1 :] for t in tickers}
+                }
+            else:
+                hist_data = get_historical_data(tickers, hist_days)
             
             # 2. Init Model
             model = AdvancedSimulationModels(hist_data)
@@ -85,9 +117,12 @@ if st.sidebar.button("Run Simulation", type="primary", use_container_width=True)
             prob_profit = np.mean(terminal_prices > start_price) * 100
             
             # Generate Future Dates
-            last_date_str = hist_data['dates'][-1]
-            last_date = datetime.strptime(last_date_str, '%Y-%m-%d')
-            future_dates = [(last_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(days_to_sim + 1)]
+            if run_mode == "Backtest Historical":
+                future_dates = actual_future['dates']
+            else:
+                last_date_str = hist_data['dates'][-1]
+                last_date = datetime.strptime(last_date_str, '%Y-%m-%d')
+                future_dates = [(last_date + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(days_to_sim + 1)]
             
             # Calculate Historical Prices for charting
             if is_portfolio:
@@ -98,9 +133,18 @@ if st.sidebar.button("Run Simulation", type="primary", use_container_width=True)
             
             # --- Main Content Area ---
             st.title("Simulated Price Trajectories")
+            if run_mode == "Backtest Historical":
+                st.subheader(f"Backtest Calibration ended on {hist_data['dates'][-1]}")
             
             # Tabs
-            tab1, tab2, tab3 = st.tabs(["📈 Simulation Paths", "📊 Distribution & Risk Analytics", "🧠 Advanced Quant Metrics"])
+            tab_names = ["📈 Simulation Paths", "📊 Distribution & Risk Analytics", "🧠 Advanced Quant Metrics"]
+            if run_mode == "Backtest Historical":
+                tab_names.append("⏱️ Backtest Results")
+                
+            tabs = st.tabs(tab_names)
+            tab1, tab2, tab3 = tabs[0], tabs[1], tabs[2]
+            if run_mode == "Backtest Historical":
+                tab4 = tabs[3]
             
             with tab1:
                 st.markdown("Showing the projected price walks over time. The **golden bold line** represents the median path.")
@@ -110,7 +154,7 @@ if st.sidebar.button("Run Simulation", type="primary", use_container_width=True)
                 fig1.add_trace(go.Scatter(
                     x=hist_data['dates'], y=hist_prices, mode='lines',
                     line=dict(color='#3b82f6', width=2),
-                    name='Historical Data'
+                    name='Historical Data (Calibration)'
                 ))
                 
                 # Plot subset of paths for performance
@@ -128,6 +172,19 @@ if st.sidebar.button("Run Simulation", type="primary", use_container_width=True)
                     line=dict(color='#fbbf24', width=3),
                     name='Median Path (50th Percentile)'
                 ))
+                
+                if run_mode == "Backtest Historical":
+                    if is_portfolio:
+                        actual_prices_array = np.array([actual_future['prices'][t] for t in tickers])
+                        actual_prices = np.sum(actual_prices_array, axis=0).tolist()
+                    else:
+                        actual_prices = actual_future['prices'][tickers[0]]
+                        
+                    fig1.add_trace(go.Scatter(
+                        x=future_dates, y=actual_prices, mode='lines',
+                        line=dict(color='#ef4444', width=4),
+                        name='Actual Realized Path (Ground Truth)'
+                    ))
                 
                 fig1.update_layout(
                     template="plotly_dark",
@@ -151,6 +208,10 @@ if st.sidebar.button("Run Simulation", type="primary", use_container_width=True)
                     fig2.add_vline(x=p5, line_dash="dash", line_color="#ef4444", annotation_text="5th Percentile")
                     fig2.add_vline(x=p50, line_dash="dash", line_color="#fbbf24", annotation_text="Median")
                     fig2.add_vline(x=p95, line_dash="dash", line_color="#10b981", annotation_text="95th Percentile")
+                    
+                    if run_mode == "Backtest Historical":
+                        actual_final = actual_prices[-1]
+                        fig2.add_vline(x=actual_final, line_dash="solid", line_color="#ef4444", line_width=3, annotation_text="Actual Final Price")
                     
                     fig2.update_layout(
                         template="plotly_dark",
@@ -203,11 +264,27 @@ if st.sidebar.button("Run Simulation", type="primary", use_container_width=True)
                     else:
                         st.warning("Enter a Strike Price in the sidebar to calculate Options Pricing and Greeks.")
             
+            if run_mode == "Backtest Historical":
+                with tab4:
+                    st.markdown("### Backtest Validation Results")
+                    actual_final_price = actual_prices[-1]
+                    
+                    st.metric("Simulated Median Expected Price", f"${p50:.2f}")
+                    st.metric("Actual Realized Price", f"${actual_final_price:.2f}")
+                    
+                    # Accuracy check
+                    is_within_var = actual_final_price >= p5
+                    
+                    if is_within_var:
+                        st.success(f"**SUCCESS:** The actual final price (${actual_final_price:.2f}) stayed safely above the 95% Confidence Value at Risk threshold (${p5:.2f}). The risk model accurately bounded the downside!")
+                    else:
+                        st.error(f"**BREACH:** The actual final price (${actual_final_price:.2f}) fell below the 95% Confidence Value at Risk threshold (${p5:.2f}). This represents a 5% tail risk event (a severe market crash).")
+
             # --- Sidebar Readout ---
             st.sidebar.divider()
             st.sidebar.markdown("### Estimated Parameters")
             if not is_portfolio:
-                st.sidebar.metric("Last Close Price", f"${model.S0:.2f}")
+                st.sidebar.metric("Last Close Price (Calibration)", f"${model.S0:.2f}")
                 st.sidebar.metric("Annualized Drift (μ)", f"{model.mu * 100:.2f}%")
                 st.sidebar.metric("Annualized Volatility (σ)", f"{model.sigma * 100:.2f}%")
             else:
@@ -217,3 +294,4 @@ if st.sidebar.button("Run Simulation", type="primary", use_container_width=True)
         st.error(f"Error: {e}")
 else:
     st.info("Enter parameters in the sidebar and click **Run Simulation** to begin.")
+

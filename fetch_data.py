@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-def get_historical_data(tickers, days: int):
+def get_historical_data(tickers, days: int, end_date_str: str = None):
     """
     Fetches historical stock data for the given tickers for a specified number of days.
     tickers: list of strings (e.g. ['AAPL', 'MSFT'])
@@ -12,7 +12,11 @@ def get_historical_data(tickers, days: int):
       - 'prices': dict mapping ticker -> list of closing prices
       - 'log_returns': pandas DataFrame of daily log returns for all tickers
     """
-    end_date = datetime.now()
+    if end_date_str is None:
+        end_date = datetime.now()
+    else:
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+        
     start_date = end_date - timedelta(days=days)
     
     # Download data
